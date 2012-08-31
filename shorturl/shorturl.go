@@ -12,6 +12,7 @@ func main() {
 		return
 	}
 	insert(db)
+	show(db)
 	db.Close()
 }
 
@@ -32,6 +33,7 @@ func show(db *sqlite.Conn){
 		fmt.Println(err)
 		return
 	}
+	defer rs.Finalize()
 	rs.Exec()
 	for rs.Next(){
 		err = rs.Scan(&id, &url, &num)
