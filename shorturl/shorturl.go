@@ -1,44 +1,73 @@
 package main
 
-import (
-	"fmt"
+import(
 	"sqlite"
+	"sync"
+	"errors"
 )
 
-func main() {
-	db,err := sqlite.Open("shorturl.sqlite")
-	if err != nil{
-		fmt.Println(err)
-		return
-	}
-	insert(db)
-	show(db)
-	db.Close()
+var con *sqlite.Conn
+
+func ConnectDb(filename string) error{
+	_con, err := sqlite.Open(filename)
+	con = _con
+	return err
 }
 
-func insert(db *sqlite.Conn){
-	err := db.Exec("insert into short_url(id,url, num) values (?, ?, ?)", 3, "http://tg.tlt.cn", 3)
-	if err != nil{
-		fmt.Println(err)
-		return
-	}
+type RandNum struct{
+	num int
+	lock sync.Mutex
+}
+var randNum RandNum
+
+type ShortUrl struct{
+	id int
+	url string
+	num string
 }
 
-func show(db *sqlite.Conn){
-	var id int
-	var url string
-	var num string
-	rs, err := db.Prepare("select * from short_url")
+func (this ShortUrl)RandNum() (string, error){
+	randNum.lock.Lock()
+	defer randNum.lock.Unlock()
+	rs, err := con.Prepare("select id from short_num limit 1")
 	if err != nil{
-		fmt.Println(err)
-		return
+		return "", err
 	}
 	defer rs.Finalize()
 	rs.Exec()
-	for rs.Next(){
-		err = rs.Scan(&id, &url, &num)
-		if err == nil{
-			fmt.Println(id, url ,num)
-		}
+	err = rs.Scan(&randNum.num)
+	if err != nil{
+		return "", err
 	}
+	con.Exec("update short_num set id=id+1 limit 1")
+	return IntToNum(randNum.num), nil
 }
+
+func (this ShortUrl)Insert() error{
+	return con.Exec("insert into short_url(url, num) values (?,?)", this.url, this.num)
+}
+
+func (this ShortUrl)Load() error{
+	if this.num == "" {
+		return errors.New("num is empty")
+	}
+	rs, err := con.Prepare("select * from short_url where num=?")
+	if err != nil{
+		return err
+	}
+	defer rs.Finalize()
+	rs.Exec()
+	if !rs.Next(){
+		return errors.New("no data")
+	}
+	err = rs.Scan(&this.id, &this.url, &this.num)
+	if err == nil{
+		return nil
+	}
+	return err
+}
+
+func main(){
+	ConnectDb("shorturl.sqlite")
+}
+
