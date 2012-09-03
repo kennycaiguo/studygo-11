@@ -17,11 +17,7 @@ func ConnectDb(filename string) error{
 	return err
 }
 
-type RandNum struct{
-	num int
-	lock sync.Mutex
-}
-var randNum RandNum
+var lock sync.Mutex
 
 type ShortUrl struct{
 	id int
@@ -29,33 +25,36 @@ type ShortUrl struct{
 	num string
 }
 
-func (this ShortUrl)RandNum() (error){
-	randNum.lock.Lock()
-	defer randNum.lock.Unlock()
+func (this *ShortUrl)GetNum() (error){
+	lock.Lock()
+	num := 0
+	defer lock.Unlock()
 	rs, err := con.Prepare("select id from short_num limit 1")
 	if err != nil{
 		return err
 	}
 	defer rs.Finalize()
-	rs.Exec()
-	err = rs.Scan(&randNum.num)
+	rs.Exec(); rs.Next()
+	err = rs.Scan(&num)
 	if err != nil{
+		fmt.Println("b")
 		return err
 	}
-	con.Exec("update short_num set id=id+1 limit 1")
-	this.num = IntToNum(randNum.num)
+	err = con.Exec("update short_num set id=id+1")
+	//fmt.Println(err)
+	this.num = IntToNum(num)
 	return nil
 }
 
-func (this ShortUrl)Insert() error{
+func (this *ShortUrl)Insert() error{
 	return con.Exec("insert into short_url(url, num) values (?,?)", this.url, this.num)
 }
 
-func (this ShortUrl)Load() error{
-	if this.num == "" {
-		return errors.New("num is empty")
+func (this *ShortUrl)LoadByUrl() error{
+	if this.url == "" {
+		return errors.New("url is empty")
 	}
-	rs, err := con.Prepare("select * from short_url where url=?")
+	rs, err := con.Prepare("select * from short_url where url=? limit 1")
 	if err != nil{
 		return err
 	}
@@ -70,6 +69,27 @@ func (this ShortUrl)Load() error{
 	}
 	return err
 }
+
+func (this *ShortUrl)LoadByNum() error{
+	if this.num== "" {
+		return errors.New("num is empty")
+	}
+	rs, err := con.Prepare("select * from short_url where num=? limit 1")
+	if err != nil{
+		return err
+	}
+	defer rs.Finalize()
+	rs.Exec(this.num)
+	if !rs.Next(){
+		return errors.New("no data")
+	}
+	err = rs.Scan(&this.id, &this.url, &this.num)
+	if err == nil{
+		return nil
+	}
+	return err
+}
+
 
 const defaultHtml string = `
 <!DOCTYPE html>
@@ -88,14 +108,19 @@ const defaultHtml string = `
 				<input type="submit" name="submit" value="生成短网址" style="width:106px;height:38px;line-height:38px;text-align:center;font-size:16px;font-weight:bold;color:#666;"/>
 			</form>
 			</div>
+			<div style="font-size:18px; text-align:center;font-weight:bold;margin-top:20px;">%s</div>
 		</div>
 	</body>
 </html>
 `
 
 func DefaultHandler(w http.ResponseWriter, r *http.Request){
+	if r.URL.Path != "/"{
+		UrlHandler(w, r)
+		return
+	}
 	if r.Method == "GET"{
-		fmt.Fprint(w, defaultHtml)
+		fmt.Fprintf(w, defaultHtml, "")
 		return
 	}
 	if r.Method != "POST"{
@@ -104,19 +129,45 @@ func DefaultHandler(w http.ResponseWriter, r *http.Request){
 	url := r.FormValue("url")
 	if strings.Index(url, "http://") != 0{
 		if strings.Index(url, "https://") != 0{
+			fmt.Fprintf(w, defaultHtml, "")
 			return
 		}
 	}
 	shortUrl := ShortUrl{0, url, ""}
-	err := shortUrl.Load()
-	if err != nil{
-		fmt.Fprintf(w, "http://%s/%s", r.Host, shortUrl.num)
+	err := shortUrl.LoadByUrl()
+	if err == nil{
+		fmt.Fprintf(w, defaultHtml, "http://" + r.Host + "/" + shortUrl.num)
 		return
 	}
-	err = shortUrl.RandNum()
+	err = shortUrl.GetNum()
+	if err != nil{
+		fmt.Println(err)
+		return
+	}
 	shortUrl.url = url
 	shortUrl.Insert()
-	fmt.Fprintf(w, "http://%s/%s", r.Host, shortUrl.num)
+	fmt.Fprintf(w, defaultHtml, "http://" + r.Host + "/" + shortUrl.num)
+}
+
+func UrlHandler(w http.ResponseWriter, r *http.Request){
+	num := r.URL.Path
+	num_len := len(num)
+	if num_len == 0{
+		fmt.Fprintf(w, defaultHtml, "地址有错")
+		return
+	}
+	if(string(num[num_len-1]) == "/"){
+		num = num[1:num_len-1]
+	}else{
+		num = num[1:num_len]
+	}
+	shortUrl := ShortUrl{0, "", num}
+	err := shortUrl.LoadByNum()
+	if err != nil{
+		fmt.Fprintf(w, defaultHtml, "地址有错")
+		return
+	}
+	http.Redirect(w, r, shortUrl.url, http.StatusFound)
 }
 
 func main(){
