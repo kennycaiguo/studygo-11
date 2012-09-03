@@ -113,7 +113,7 @@ func DefaultHandler(w http.ResponseWriter, r *http.Request){
 		fmt.Fprintf(w, "http://%s/%s", r.Host, shortUrl.num)
 		return
 	}
-	shortUrl.num, _ = shortUrl.RandNum()
+	err = shortUrl.RandNum()
 	shortUrl.url = url
 	shortUrl.Insert()
 	fmt.Fprintf(w, "http://%s/%s", r.Host, shortUrl.num)
