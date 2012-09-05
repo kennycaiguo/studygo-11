@@ -7,6 +7,7 @@ import(
 	"net/http"
 	"fmt"
 	"strings"
+	"regexp"
 )
 
 var con *sqlite.Conn
@@ -114,6 +115,38 @@ const defaultHtml string = `
 </html>
 `
 
+/*****************路由处理*******************/
+type route struct{
+	pattern *regexp.Regexp
+	handler http.Handler
+}
+
+type RegexpHandler struct{
+	routes []*route
+}
+
+//func (this *RegexpHandler)Handler(pattern *regexp.Regexp, handler http.Handler){
+func (this *RegexpHandler)Handler(s string, handler http.Handler){
+	pattern, _:= regexp.Compile(s)
+	this.routes = append(this.routes, &route{pattern, handler})
+}
+
+func (this *RegexpHandler)HandleFunc(s string, handler http.Handler){
+	pattern, _:= regexp.Compile(s)
+	this.routes = append(this.routes, &route{pattern, this.HandleFunc(s, handler)})
+}
+
+func (this *RegexpHandler)ServeHTTP(w http.ResponseWriter, r *http.Request){
+	for _, route := range this.routes{
+		if route.pattern.MatchString(r.URL.Path){
+			route.handler.ServeHTTP(w, r)
+			return
+		}
+	}
+	http.NotFound(w, r)
+}
+/***********end**************/
+
 func DefaultHandler(w http.ResponseWriter, r *http.Request){
 	if r.URL.Path != "/"{
 		UrlHandler(w, r)
@@ -177,8 +210,13 @@ func main(){
 		return
 	}
 	defer con.Close()
-	http.HandleFunc("/", DefaultHandler)
-	err = http.ListenAndServe(":8080", nil)
+	var _handler RegexpHandler
+	//http.HandleFunc("/", DefaultHandler)
+	
+	_handler.HandleFunc("/", DefaultHandler)
+	_handler.HandleFunc("/.*", UrlHandler)
+	//err = http.ListenAndServe(":8080", nil)
+	err = http.ListenAndServe(":8080", &_handler)
 	if err != nil{
 		fmt.Println(err)
 		return
