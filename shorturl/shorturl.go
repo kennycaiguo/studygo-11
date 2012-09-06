@@ -100,16 +100,20 @@ const defaultHtml string = `
 		<title>短网址服务</title>
 	</head>
 	<body style="color:#666;">
-		<div style="width:700px;margin:136px auto 0;">
-			<div style="font-size:24px;font-weight:bold;text-align:center;color:#999;margin-bottom:50px;">短网址服务</div>
+	<div><span><a href='http://www.tlt.cn/' target='_blank' style='color:#999; font-size:13px;font-weight:normal;text-decoration:none;margin:10px;'>访问太灵通</a></span></div>
+		<div style="width:700px;margin:80px auto 0;">
+			<div style="font-weight:bold;text-align:center;color:#999;margin-bottom:50px;">短网址服务</div>
 			<div>
 			<form method="post" action="/">
-				<span style="font-weight:bold;font-size:24px;line-height38px;">网址:</span>
-				<input type="text" name="url" style="width:500px;height:30px;line-height:30px;font-size:14px;"/>
-				<input type="submit" name="submit" value="生成短网址" style="width:106px;height:38px;line-height:38px;text-align:center;font-size:16px;font-weight:bold;color:#666;"/>
+				<span style="line-height38px;">网址:</span>
+				<input type="text" name="url" style="width:500px;height:30px;line-height:30px;font-size:14px;border:solid 1px #666"/>
+				<input type="submit" name="submit" value="生成短网址" style="height:38px;line-height:38px;text-align:center;color:#666;border:solid 1px #666"/>
 			</form>
 			</div>
 			<div style="font-size:18px; text-align:center;font-weight:bold;margin-top:20px;">%s</div>
+		</div>
+		<div style='text-align:center;font-size:12px;position:absolute;bottom:0;right:0;'>
+		Copyright © 2009 - 2012 太灵通. All Rights Reserved
 		</div>
 	</body>
 </html>
@@ -131,9 +135,9 @@ func (this *RegexpHandler)Handler(s string, handler http.Handler){
 	this.routes = append(this.routes, &route{pattern, handler})
 }
 
-func (this *RegexpHandler)HandleFunc(s string, handler http.Handler){
+func (this *RegexpHandler)HandleFunc(s string, handler func(http.ResponseWriter, *http.Request)){
 	pattern, _:= regexp.Compile(s)
-	this.routes = append(this.routes, &route{pattern, this.HandleFunc(s, handler)})
+	this.routes = append(this.routes, &route{pattern, http.HandlerFunc(handler)})
 }
 
 func (this *RegexpHandler)ServeHTTP(w http.ResponseWriter, r *http.Request){
@@ -148,10 +152,10 @@ func (this *RegexpHandler)ServeHTTP(w http.ResponseWriter, r *http.Request){
 /***********end**************/
 
 func DefaultHandler(w http.ResponseWriter, r *http.Request){
-	if r.URL.Path != "/"{
+	/*if r.URL.Path != "/"{
 		UrlHandler(w, r)
 		return
-	}
+	}*/
 	if r.Method == "GET"{
 		fmt.Fprintf(w, defaultHtml, "")
 		return
@@ -213,10 +217,10 @@ func main(){
 	var _handler RegexpHandler
 	//http.HandleFunc("/", DefaultHandler)
 	
+	_handler.HandleFunc("/[a-zA-Z0-9]+", UrlHandler)
 	_handler.HandleFunc("/", DefaultHandler)
-	_handler.HandleFunc("/.*", UrlHandler)
 	//err = http.ListenAndServe(":8080", nil)
-	err = http.ListenAndServe(":8080", &_handler)
+	err = http.ListenAndServe("0.0.0.0:8080", &_handler)
 	if err != nil{
 		fmt.Println(err)
 		return
