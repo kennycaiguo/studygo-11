@@ -156,6 +156,8 @@ func DefaultHandler(w http.ResponseWriter, r *http.Request){
 		UrlHandler(w, r)
 		return
 	}*/
+	//rootUrl := r.Header["Referer"][0]
+	rootUrl := "http://" + r.Host + "/"
 	if r.Method == "GET"{
 		fmt.Fprintf(w, defaultHtml, "")
 		return
@@ -173,7 +175,7 @@ func DefaultHandler(w http.ResponseWriter, r *http.Request){
 	shortUrl := ShortUrl{0, url, ""}
 	err := shortUrl.LoadByUrl()
 	if err == nil{
-		fmt.Fprintf(w, defaultHtml, "http://" + r.Host + "/" + shortUrl.num)
+		fmt.Fprintf(w, defaultHtml, rootUrl + shortUrl.num)
 		return
 	}
 	err = shortUrl.GetNum()
@@ -183,7 +185,7 @@ func DefaultHandler(w http.ResponseWriter, r *http.Request){
 	}
 	shortUrl.url = url
 	shortUrl.Insert()
-	fmt.Fprintf(w, defaultHtml, "http://" + r.Host + "/" + shortUrl.num)
+	fmt.Fprintf(w, defaultHtml, rootUrl + shortUrl.num)
 }
 
 func UrlHandler(w http.ResponseWriter, r *http.Request){
@@ -215,8 +217,6 @@ func main(){
 	}
 	defer con.Close()
 	var _handler RegexpHandler
-	//http.HandleFunc("/", DefaultHandler)
-	
 	_handler.HandleFunc("/[a-zA-Z0-9]+", UrlHandler)
 	_handler.HandleFunc("/", DefaultHandler)
 	//err = http.ListenAndServe(":8080", nil)
