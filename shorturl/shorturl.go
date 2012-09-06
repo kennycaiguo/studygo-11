@@ -8,6 +8,8 @@ import(
 	"fmt"
 	"strings"
 	"regexp"
+	"os"
+	"flag"
 )
 
 var con *sqlite.Conn
@@ -210,7 +212,13 @@ func UrlHandler(w http.ResponseWriter, r *http.Request){
 }
 
 func main(){
-	err := ConnectDb("shorturl.sqlite")
+	path := flag.String("path", "", "sqlite path")
+	flag.Parse()
+	if *path == ""{
+		*path,_ = os.Getwd()
+	}
+	fmt.Println(*path)
+	err := ConnectDb(*path + "/shorturl.sqlite")
 	if err != nil{
 		fmt.Println(err)
 		return
