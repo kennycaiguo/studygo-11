@@ -3,15 +3,17 @@ package main
 
 import(
 	"github.com/astaxie/beego"
+	"encoding/base64"
 	"strings"
 	"net/mail"
+	"net/smtp"
 	"time"
+	"flag"
 	"fmt"
 )
 
-var defaultFromEmailAddr string
-var defaultFromName string
 var defaultFrom mail.Address
+var b64 *base64.Encoding 
 
 type Msg struct{
 	To string
@@ -22,14 +24,12 @@ type Msg struct{
 var msgChan chan *Msg
 var timeOutChan chan bool
 
-
-func init(){
-	defaultFromEmailAddr = "service@tlt.cn"
-	defaultFromName = "太灵通"
-	defaultFrom = mail.Address{defaultFromName, defaultFromEmailAddr}
-	msgChan = make(chan *Msg, 5000)
-	timeOutChan = make(chan bool)
-}
+var (
+	paramHost = flag.String("host", "", "email server ip")
+	paramPort = flag.String("port", "25", "email server port")
+	paramFromEmail = flag.String("from", "service@tlt.cn", "from")
+	paramFromName = flag.String("name", "TLT", "from")
+)
 
 /***********/
 
@@ -42,7 +42,28 @@ func sendMail(){
 	for{
 		msg := <- msgChan
 		fmt.Printf("to=%s,subject=%s,body=%s\n", msg.To, msg.Subject, msg.Body)
-		time.Sleep(1e9*20)
+		header := make(map[string]string)
+		header["From"] = defaultFrom.String()
+		header["To"] = msg.To
+		header["Subject"] = fmt.Sprintf("=?UTF-8?B?%s?=", b64.EncodeToString([]byte(msg.Subject)))
+		header["MIME-Version"] = "1.0"
+		header["Content-Type"] = "text/html; charset=UTF-8"
+		header["Content-Transfer-Encoding"] = "base64"
+
+		message := ""
+
+		for k, v := range header {
+			message += fmt.Sprintf("%s: %s\r\n", k, v)
+		}
+		message += "\r\n" + b64.EncodeToString([]byte(msg.Body))
+		//auth := smtp.PlainAuth("", "", "", host)
+		//err := smtp.SendMail(host, auth, "service@tlt.cn", []string{to.Address}, []byte(message))
+		err := smtp.SendMail(*paramHost+":"+*paramPort, nil, *paramFromEmail, []string{msg.To}, []byte(message))
+		if err != nil{
+			fmt.Println("send success")
+		}else{
+			fmt.Println(err)
+		}
 	}
 }
 
@@ -108,12 +129,24 @@ func (this *SendMailController)Post(){
 }
 
 func main(){
+
+	flag.Parse()
+	if *paramHost== ""{
+		flag.PrintDefaults()
+		return
+	}
+	defaultFrom = mail.Address{*paramFromName, *paramFromEmail}
+	msgChan = make(chan *Msg, 5000)
+	timeOutChan = make(chan bool)
+	b64 = base64.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
+
 	go sendMail()
 	go sendMail()
 	go sendMail()
 	go sendMail()
 	go sendMail()
 	go timeOut()
-	beego.RegisterController("/sendmail", &SendMailController{})
+
+	beego.RegisterController("/", &SendMailController{})
 	beego.Run()
 }
