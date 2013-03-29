@@ -11,7 +11,7 @@ func main(){
 	host := "192.168.0.243:25"
 
 	from := mail.Address{"发件人", "service@tlt.cn"}
-	to := mail.Address{"收件人", "tzm529@163.com"}
+	to := mail.Address{"收件人", "tzm529@gmail.com"}
 	header := make(map[string]string)
 	header["From"] = from.String()
 	header["To"] = to.String()
@@ -29,7 +29,7 @@ func main(){
 		message += fmt.Sprintf("%s: %s\r\n", k, v)
 	}
 	message += "\r\n" + b64.EncodeToString([]byte(body))
-	auth := smtp.PlainAuth("", "", "", host)
-	err := smtp.SendMail(host, auth, "service@tlt.cn", []string{to.Address}, []byte(message))
+	//auth := smtp.PlainAuth("", "", "", host)
+	err := smtp.SendMail(host, nil, "service@tlt.cn", []string{to.Address}, []byte(message))
 	fmt.Println(err)
 }
