@@ -41,7 +41,7 @@ func timeOut(){
 func sendMail(){
 	for{
 		msg := <- msgChan
-		fmt.Printf("to=%s,subject=%s,body=%s\n", msg.To, msg.Subject, msg.Body)
+		fmt.Printf("to=%s,subject=%s\n", msg.To, msg.Subject)
 		header := make(map[string]string)
 		header["From"] = defaultFrom.String()
 		header["To"] = msg.To
@@ -59,7 +59,7 @@ func sendMail(){
 		//auth := smtp.PlainAuth("", "", "", host)
 		//err := smtp.SendMail(host, auth, "service@tlt.cn", []string{to.Address}, []byte(message))
 		err := smtp.SendMail(*paramHost+":"+*paramPort, nil, *paramFromEmail, []string{msg.To}, []byte(message))
-		if err != nil{
+		if err == nil{
 			fmt.Println("send success")
 		}else{
 			fmt.Println(err)
